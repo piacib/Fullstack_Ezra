@@ -1,0 +1,29 @@
+{
+  "name": "pocketbase",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "loadSecrets": "env-cmd -f ./dev.env",
+    "code": "nodemon index.ts",
+    "dev": "yarn loadSecrets yarn code",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "dependencies": {
+    "env-cmd": "^10.1.0",
+    "fs": "^0.0.1-security",
+    "lodash": "^4.17.21",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.0.1",
+    "pocketbase": "^0.19.0",
+    "puppeteer": "^21.5.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.4"
+  }
+}
