@@ -1,18 +1,17 @@
 import puppeteer from "puppeteer";
 import * as fs from "fs";
-// import lastUpdated from "./lastupdated.json"; //assert { type: "json" };
+import lastUpdated from "../lastupdated.json"; //assert { type: "json" };
 
 interface BOOKAUTHORDATA {
   title: string;
   authors: string[];
   originalText: string;
 }
-interface TITLEDATE {
-  episodeTitle: string;
-  date: Date;
-}
-interface DATA extends BOOKAUTHORDATA, TITLEDATE {
+
+interface DATA extends BOOKAUTHORDATA {
   guest: string;
+  episodeTitle: string;
+  episodeDate: Date;
 }
 // console.log(new Date(lastUpdated));
 /// *** FETCHES NYT PAGE AND RETURNS ARRAY OF BOOKS PARSED *** ///
@@ -28,17 +27,22 @@ const writeDataToJson = (data: any, name: string) => {
 };
 
 const parseNYTPage = (expr = "parseAllData") => {
-  const parseEpisodeandDate = (pNode: HTMLParagraphElement): TITLEDATE => {
+  const parseEpisodeTitle = (pNode: HTMLParagraphElement): string => {
+    const lastFirstParenth = pNode.innerText.lastIndexOf("(");
+    const episodeTitle = pNode.innerText.slice(0, lastFirstParenth).trim();
+    return episodeTitle;
+  };
+  const parseEpisodeDate = (pNode: HTMLParagraphElement): Date => {
     const lastParenth = pNode.innerText.lastIndexOf(")");
     const lastFirstParenth = pNode.innerText.lastIndexOf("(");
     const date = pNode.innerText.slice(lastFirstParenth + 1, lastParenth);
-    const episodeTitle = pNode.innerText.slice(0, lastFirstParenth).trim();
-    return { episodeTitle, date: new Date(date) };
+    return new Date(date);
   };
-  const parseBooks = (ulNode: HTMLUListElement) => {
+
+  const parseBooks = (ulNode: HTMLUListElement): BOOKAUTHORDATA[] => {
     const liNodes = ulNode.children as HTMLCollectionOf<HTMLLIElement>;
     if (liNodes === undefined) {
-      return;
+      return [];
     }
     let books: BOOKAUTHORDATA[] = [];
     Array.from(liNodes).forEach((bookAuthorNode) => {
@@ -54,17 +58,19 @@ const parseNYTPage = (expr = "parseAllData") => {
           authors: authors ? authors : [],
           originalText: text,
         });
-        return;
+        return books;
       }
       books.push({ title, authors: [], originalText: text });
     });
     return books;
   };
-  const parseEntry = (h2Node: HTMLHeadingElement) => {
+  const parseEpisodeEntry = (h2Node: HTMLHeadingElement) => {
     const data: DATA[] = [];
     const guest = h2Node.innerText;
     const titleEl = h2Node.nextSibling as HTMLParagraphElement;
-    const titleDateObj = parseEpisodeandDate(titleEl);
+    const episodeTitle = parseEpisodeTitle(titleEl);
+    const episodeDate = parseEpisodeDate(titleEl);
+
     const booksUL = titleEl.nextSibling as HTMLUListElement;
     const booksArr = parseBooks(booksUL);
     if (!booksArr) {
@@ -73,7 +79,8 @@ const parseNYTPage = (expr = "parseAllData") => {
     booksArr.forEach((book) => {
       data.push({
         ...book,
-        ...titleDateObj,
+        episodeTitle,
+        episodeDate,
         guest,
       });
     });
@@ -88,7 +95,7 @@ const parseNYTPage = (expr = "parseAllData") => {
 
     const guestArr = Array.from(guestNodeList);
     guestArr.forEach((x) => {
-      const results = parseEntry(x);
+      const results = parseEpisodeEntry(x);
       data.push(...results);
     });
     return data;
