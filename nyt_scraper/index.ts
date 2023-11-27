@@ -38,8 +38,7 @@ const parseNYTPage = (expr = "parseAllData") => {
     const date = pNode.innerText.slice(lastFirstParenth + 1, lastParenth);
     return new Date(date);
   };
-
-  const parseBooks = (ulNode: HTMLUListElement): BOOKAUTHORDATA[] => {
+  const parseEpisodeBookRecs = (ulNode: HTMLUListElement): BOOKAUTHORDATA[] => {
     const liNodes = ulNode.children as HTMLCollectionOf<HTMLLIElement>;
     if (liNodes === undefined) {
       return [];
@@ -72,7 +71,7 @@ const parseNYTPage = (expr = "parseAllData") => {
     const episodeDate = parseEpisodeDate(titleEl);
 
     const booksUL = titleEl.nextSibling as HTMLUListElement;
-    const booksArr = parseBooks(booksUL);
+    const booksArr = parseEpisodeBookRecs(booksUL);
     if (!booksArr) {
       return data;
     }
