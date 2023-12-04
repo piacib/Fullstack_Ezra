@@ -1,6 +1,5 @@
 import puppeteer from "puppeteer";
 import * as fs from "fs";
-import latestEpisode from "./latestEpisodeDate.json" assert { type: "json" };
 import newEpisodes from "./newEpisodes.json" assert { type: "json" };
 import _ from "lodash";
 
@@ -21,6 +20,11 @@ interface newEpisodeJSON {
 // Type cast newEpisodes to newEpisodeJSON
 const newEpisodeJSON = newEpisodes as newEpisodeJSON;
 
+// Get most recent episode date
+const episodeDatesArray = Object.values(newEpisodeJSON).map(
+  (x) => new Date(x.episodeDate).getTime() + 24 * 60 * 60 * 1000
+);
+const latestEpisode = new Date(Math.max.apply(null, episodeDatesArray));
 // Define constants
 const url = "https://www.nytimes.com/article/ezra-klein-show-book-recs.html";
 const ALLDATAFILENAME = "data.json";
@@ -142,8 +146,7 @@ const appendNewEpisodeDataToJSON = (
     ? Math.max(...Object.keys(oldData).map((x) => Number(x))) + 1
     : 1;
   const oldDataKeys = Object.keys(oldData);
-  console.log(oldDataKeys);
-  console.log(newEpisodes);
+  let newEpisodeCount = 0;
   newEpisodes.forEach((newEpisode) => {
     // Iterate over episode numbers for the new entry
     const isEntryNew =
@@ -152,9 +155,14 @@ const appendNewEpisodeDataToJSON = (
 
     if (isEntryNew) {
       updatedData[String(episodeNumber++)] = newEpisode;
+      newEpisodeCount++;
     }
   });
-  writeDataToJson(updatedData, "../newEpisodes.json");
+  console.log(`${newEpisodeCount} entries added to newEpisodes.json`);
+  if (!newEpisodeCount) {
+    // Write the updated data to the newEpisodes.json file
+    writeDataToJson(updatedData, "../newEpisodes.json");
+  }
 };
 // Main scraping function
 const scrape = async ({
