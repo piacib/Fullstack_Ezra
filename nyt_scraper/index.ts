@@ -3,14 +3,13 @@ import * as fs from "fs";
 import latestEpisode from "./latestEpisodeDate.json" assert { type: "json" };
 import newEpisodes from "./newEpisodes.json" assert { type: "json" };
 import _ from "lodash";
-import { fileURLToPath } from "url";
 
+// Define interfaces for data structures
 interface BOOKAUTHORDATA {
   title: string;
   authors: string[];
   originalText: string;
 }
-
 interface DATA extends BOOKAUTHORDATA {
   guest: string;
   episodeTitle: string;
@@ -19,14 +18,18 @@ interface DATA extends BOOKAUTHORDATA {
 interface newEpisodeJSON {
   [k: string]: DATA;
 }
+// Type cast newEpisodes to newEpisodeJSON
 const newEpisodeJSON = newEpisodes as newEpisodeJSON;
 
+// Define constants
 const url = "https://www.nytimes.com/article/ezra-klein-show-book-recs.html";
 const ALLDATAFILENAME = "data.json";
 const NEWEPISODEFILENAME = "newEpisodes.json";
 const LASTEPISODEFILENAME = "lastestEpisodeDate.json";
 
 /// *** FETCHES NYT PAGE AND RETURNS ARRAY OF BOOKS PARSED *** ///
+
+// Function to write data to a JSON file
 const writeDataToJson = (data: any, name: string) => {
   console.log(`writing data to ${name}...`);
   try {
@@ -36,16 +39,8 @@ const writeDataToJson = (data: any, name: string) => {
     throw error;
   }
 };
-const appendDataToJson = (data: any, name: string) => {
-  console.log(`writing data to ${name}...`);
-  try {
-    fs.appendFileSync(name, JSON.stringify(data));
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
-};
 
+// Function to parse the NYT page and extract relevant data
 const parseNYTPage = () => {
   const parseEpisodeTitle = (pNode: HTMLParagraphElement): string => {
     const lastFirstParenth = pNode.innerText.lastIndexOf("(");
@@ -124,34 +119,44 @@ const parseNYTPage = () => {
   };
   return parsePage();
 };
+
+// Interface for the properties used in scraping
 interface ScrapeProps {
   url: string;
   parsePageFunc: () => DATA[];
   pathtofile?: string;
   fileName?: string;
 }
-const appendNewEpisodeDataToJSON = (data: DATA[]) => {
-  // Filter Data to post 
-  const newData = data.filter(
+// Function to append new episode data to the existing JSON file
+const appendNewEpisodeDataToJSON = (
+  newData: DATA[],
+  oldData = newEpisodeJSON
+) => {
+  let updatedData = oldData;
+  // Filter Data to extract new Episodes
+  const newEpisodes = newData.filter(
     (x) => new Date(x.episodeDate) > new Date(latestEpisode)
   );
-  let episodeNumber = Object.keys(newEpisodeJSON).length
-    ? Math.max(...Object.keys(newEpisodeJSON).map((x) => Number(x))) + 1
-    : 1;
 
-  newData.forEach((x) => {
-    Array.from(Array(episodeNumber).keys()).filter((newEntry) => {
-      const isEntryNew =
-        Object.keys(newEpisodeJSON).filter((key) =>
-          _.isEqual(newEpisodeJSON[key], newEntry)
-        ).length === 0;
-      if (isEntryNew) {
-        newEpisodeJSON[String(episodeNumber++)] = x;
-      }
-    });
-    writeDataToJson(newEpisodeJSON, "../newEpisodes.json");
+  let episodeNumber = Object.keys(oldData).length
+    ? Math.max(...Object.keys(oldData).map((x) => Number(x))) + 1
+    : 1;
+  const oldDataKeys = Object.keys(oldData);
+  console.log(oldDataKeys);
+  console.log(newEpisodes);
+  newEpisodes.forEach((newEpisode) => {
+    // Iterate over episode numbers for the new entry
+    const isEntryNew =
+      oldDataKeys.filter((key) => _.isEqual(oldData[key], newEpisode))
+        .length === 0;
+
+    if (isEntryNew) {
+      updatedData[String(episodeNumber++)] = newEpisode;
+    }
   });
+  writeDataToJson(updatedData, "../newEpisodes.json");
 };
+// Main scraping function
 const scrape = async ({
   url,
   parsePageFunc,
@@ -182,7 +187,7 @@ const scrape = async ({
   console.log(latestEpisode);
   // Close the browser
   await browser.close();
-  return data;
+  return;
 };
 
 scrape({
