@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer";
 import * as fs from "fs";
-import lastUpdated from "../lastupdated.json"; //assert { type: "json" };
+import latestEpisode from "./latestEpisodeDate.json" assert { type: "json" };
+import newEpisodes from "./newEpisodes.json" assert { type: "json" };
 
 interface BOOKAUTHORDATA {
   title: string;
@@ -11,11 +12,19 @@ interface BOOKAUTHORDATA {
 interface DATA extends BOOKAUTHORDATA {
   guest: string;
   episodeTitle: string;
-  episodeDate: Date;
+  episodeDate: string;
 }
-// console.log(new Date(lastUpdated));
+interface newEpisodeJSON {
+  [k: number]: DATA;
+}
+const newEpisodeJSON = newEpisodes as newEpisodeJSON;
+
+const url = "https://www.nytimes.com/article/ezra-klein-show-book-recs.html";
+const ALLDATAFILENAME = "data.json";
+const NEWEPISODEFILENAME = "newEpisodes.json";
+const LASTEPISODEFILENAME = "lastestEpisodeDate.json";
+
 /// *** FETCHES NYT PAGE AND RETURNS ARRAY OF BOOKS PARSED *** ///
-// import allData from "./data.json" assert { type: "json" };
 const writeDataToJson = (data: any, name: string) => {
   console.log(`writing data to ${name}...`);
   try {
@@ -25,18 +34,27 @@ const writeDataToJson = (data: any, name: string) => {
     throw error;
   }
 };
+const appendDataToJson = (data: any, name: string) => {
+  console.log(`writing data to ${name}...`);
+  try {
+    fs.appendFileSync(name, JSON.stringify(data));
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
 
-const parseNYTPage = (expr = "parseAllData") => {
+const parseNYTPage = () => {
   const parseEpisodeTitle = (pNode: HTMLParagraphElement): string => {
     const lastFirstParenth = pNode.innerText.lastIndexOf("(");
     const episodeTitle = pNode.innerText.slice(0, lastFirstParenth).trim();
     return episodeTitle;
   };
-  const parseEpisodeDate = (pNode: HTMLParagraphElement): Date => {
+  const parseEpisodeDate = (pNode: HTMLParagraphElement): string => {
     const lastParenth = pNode.innerText.lastIndexOf(")");
     const lastFirstParenth = pNode.innerText.lastIndexOf("(");
     const date = pNode.innerText.slice(lastFirstParenth + 1, lastParenth);
-    return new Date(date);
+    return date;
   };
   const parseEpisodeBookRecs = (ulNode: HTMLUListElement): BOOKAUTHORDATA[] => {
     const liNodes = ulNode.children as HTMLCollectionOf<HTMLLIElement>;
@@ -91,58 +109,28 @@ const parseNYTPage = (expr = "parseAllData") => {
   const parsePage = () => {
     const guestNodeList = getH2s;
     const data: DATA[] = [];
-
     const guestArr = Array.from(guestNodeList);
     guestArr.forEach((x) => {
       const results = parseEpisodeEntry(x);
-      data.push(...results);
+      if (!(typeof results === "string")) {
+        data.push(...results);
+      } else {
+        return;
+      }
     });
     return data;
   };
-  //   const parseLatestEpisode = () => {
-  //     const guestNodeList = getH2s;
-  //     const isNewEpisode = true;
-  //     let newEpisodes = [];
-  //     let entry = 0;
-  //     while (isNewEpisode) {
-  //       const episode = guestNodeList[entry];
-  //       const episodeData = parseEntry(episode);
-  //       const dataFiltered = allData.filter((entry) =>
-  //         _isEqual(entry, episodeData)
-  //       );
-  //       if (dataFiltered && dataFiltered.length > 1) {
-  //         throw Error("duplicate entry", dataFiltered);
-  //       }
-  //       if (dataFiltered && dataFiltered.length === 1) {
-  //         isNewEpisode = false;
-  //         break;
-  //       }
-  //       newEpisodes.push(episode);
-  //       entry++;
-  //     }
-  //     return newEpisodes;
-  //   };
-  switch (expr) {
-    case "parseAllData":
-      const fullPageData = parsePage();
-      return fullPageData;
-    // case "parseNewestEpisodes":
-    //   console.log("parseNewestEpisodes");
-    //   const latestEpisodeData = parseLatestEpisode();
-    //   return latestEpisodeData;
-  }
+  return parsePage();
 };
 interface ScrapeProps {
   url: string;
-  parsePageFunc: any;
-  lastUpdated: string;
+  parsePageFunc: () => DATA[];
   pathtofile?: string;
   fileName?: string;
 }
 const scrape = async ({
   url,
   parsePageFunc,
-  lastUpdated,
   pathtofile = "../../",
   fileName = "",
 }: ScrapeProps) => {
@@ -158,24 +146,34 @@ const scrape = async ({
   await page.goto(url, {
     waitUntil: "domcontentloaded",
   });
-  const scrapeAllData = await page.evaluate(parsePageFunc);
-  const data = scrapeAllData;
+  const data = await page.evaluate(parsePageFunc);
   // save data
-  if (fileName) {
-    writeDataToJson(new Date(), pathtofile + "lastupdated.json");
-
+  if (fileName == ALLDATAFILENAME) {
+    writeDataToJson(data[0]?.episodeDate, pathtofile + LASTEPISODEFILENAME);
     writeDataToJson(data, pathtofile + fileName);
   }
+  if (fileName == NEWEPISODEFILENAME) {
+    const newData = data.filter(
+      (x) => new Date(x.episodeDate) > new Date(latestEpisode)
+    );
+    let episodeNumber = Object.keys(newEpisodeJSON).length
+      ? Math.max(...Object.keys(newEpisodeJSON).map((x) => Number(x))) + 1
+      : 1;
+
+    newData.forEach((x) => {
+      newEpisodeJSON[episodeNumber++] = x;
+    });
+    writeDataToJson(newEpisodeJSON, "../newEpisodes.json");
+  }
+
+  console.log(latestEpisode);
   // Close the browser
   await browser.close();
   return data;
 };
 
-const url = "https://www.nytimes.com/article/ezra-klein-show-book-recs.html";
-
 scrape({
   url,
-  lastUpdated: "10",
   parsePageFunc: parseNYTPage,
-  fileName: "../../data.json",
+  fileName: NEWEPISODEFILENAME,
 });
