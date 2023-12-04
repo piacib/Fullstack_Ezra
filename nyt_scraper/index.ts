@@ -2,6 +2,8 @@ import puppeteer from "puppeteer";
 import * as fs from "fs";
 import latestEpisode from "./latestEpisodeDate.json" assert { type: "json" };
 import newEpisodes from "./newEpisodes.json" assert { type: "json" };
+import _ from "lodash";
+import { fileURLToPath } from "url";
 
 interface BOOKAUTHORDATA {
   title: string;
@@ -15,7 +17,7 @@ interface DATA extends BOOKAUTHORDATA {
   episodeDate: string;
 }
 interface newEpisodeJSON {
-  [k: number]: DATA;
+  [k: string]: DATA;
 }
 const newEpisodeJSON = newEpisodes as newEpisodeJSON;
 
@@ -128,6 +130,28 @@ interface ScrapeProps {
   pathtofile?: string;
   fileName?: string;
 }
+const appendNewEpisodeDataToJSON = (data: DATA[]) => {
+  // Filter Data to post 
+  const newData = data.filter(
+    (x) => new Date(x.episodeDate) > new Date(latestEpisode)
+  );
+  let episodeNumber = Object.keys(newEpisodeJSON).length
+    ? Math.max(...Object.keys(newEpisodeJSON).map((x) => Number(x))) + 1
+    : 1;
+
+  newData.forEach((x) => {
+    Array.from(Array(episodeNumber).keys()).filter((newEntry) => {
+      const isEntryNew =
+        Object.keys(newEpisodeJSON).filter((key) =>
+          _.isEqual(newEpisodeJSON[key], newEntry)
+        ).length === 0;
+      if (isEntryNew) {
+        newEpisodeJSON[String(episodeNumber++)] = x;
+      }
+    });
+    writeDataToJson(newEpisodeJSON, "../newEpisodes.json");
+  });
+};
 const scrape = async ({
   url,
   parsePageFunc,
@@ -153,19 +177,8 @@ const scrape = async ({
     writeDataToJson(data, pathtofile + fileName);
   }
   if (fileName == NEWEPISODEFILENAME) {
-    const newData = data.filter(
-      (x) => new Date(x.episodeDate) > new Date(latestEpisode)
-    );
-    let episodeNumber = Object.keys(newEpisodeJSON).length
-      ? Math.max(...Object.keys(newEpisodeJSON).map((x) => Number(x))) + 1
-      : 1;
-
-    newData.forEach((x) => {
-      newEpisodeJSON[episodeNumber++] = x;
-    });
-    writeDataToJson(newEpisodeJSON, "../newEpisodes.json");
+    appendNewEpisodeDataToJSON(data);
   }
-
   console.log(latestEpisode);
   // Close the browser
   await browser.close();
